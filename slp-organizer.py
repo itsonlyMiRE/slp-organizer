@@ -1,7 +1,3 @@
-from slippi import Game
-from pathlib import Path
-import re,os,time,multiprocessing as mp
-
 '''
 PROGRAM:
 slp-organizer
@@ -15,9 +11,9 @@ Hogs resources pretty hard, probably pushes your CPU to 100% utilization.
 
 DESCRIPTION:
 Iterates through all .slp files found in master SLP_DIR directory.
-Organizes the files into folders in terms of (user choice):
+Organizes the files into subdirectories in terms of (user choice):
     - date
-    - W/L/draw/unfinished
+    - W/L/other
     - my char
     - opponent char
 
@@ -27,13 +23,23 @@ Single process: 500 files iterated per ~90 seconds (~333 files/minute, ~5.55 fil
 Multiprocessing: 4136 files iterated in ~114 seconds (~2176 files/minute, ~36.26 files/second)
 
 TO DO:
+    - look into changing os.rename command based on user OS
     - check if file is already where it belongs, to eliminate redundancy
-    - check if file is netplay (mychar/oppchar don't work if it isn't)
+    - add progress bar :D
+    - convert to GUI app, maybe with Gooey
 '''
 
-# define global constants
-SLP_DIR = '/home/mire/Slippi/test/Pound-2019'
-MY_CODE = 'MIRE#409'
+from slippi import Game
+from pathlib import Path
+from time import sleep,time
+import re,os,time,multiprocessing as mp,glob
+
+# define important globals
+#SLP_DIR = '/home/mire/code/slp-organizer/500-item-test' # my test
+SLP_DIR = input('\nEnter full path to your Slippi .slp directory: ')
+if SLP_DIR[-1] == '/':
+    SLP_DIR = SLP_DIR[:-1]
+MY_CODE = ''
 NUM_PROCESSES = mp.cpu_count()
 
 
@@ -41,117 +47,161 @@ NUM_PROCESSES = mp.cpu_count()
 def iterate_group(group, classifier):
     """
     Iterates through SLP_DIR+'/tmp/' directory, then organizes .slp files found into
-    corresponding folders based on date, match outcome, user character, or opponent character.
+    corresponding subdirectories based on date, match outcome, user character, or opponent character.
     """
     # for each file in that group
-    for filename in group:
+    for filepath in group:
         # if the item is a slp replay
-        if Path(filename).suffix == '.slp':
-            curr_file = (SLP_DIR+'/tmp/'+filename)
+        if Path(filepath).suffix == '.slp':
+            curr_file = filepath
+            filename = filepath.split('/')[-1]
             if os.path.isfile(curr_file):
                 game = Game(curr_file)
                 #print(game)
                 # pull data based on classifier
+                # choice 1: date
                 if classifier == 'date':    
                     date = re.findall('\d\d\d\d-\d\d-\d\d', str(game))[0]
-                    print('file moved to ' + SLP_DIR+'/'+date+'/'+filename) # placeholder for moving file
+                    #print('file moved to ' + SLP_DIR+'/'+date+'/'+filename) # debug output
                     try:
-                        os.rename(curr_file, SLP_DIR+'/'+date+'/'+filename)
+                        os.rename(curr_file, SLP_DIR+'/'+date+'-matches/'+(filename))
                     except FileNotFoundError:
-                        os.mkdir(SLP_DIR+'/'+date)
-                        os.rename(curr_file, SLP_DIR+'/'+date+'/'+filename)
+                        os.mkdir(SLP_DIR+'/'+date+'-matches/')
+                        os.rename(curr_file, SLP_DIR+'/'+date+'-matches/'+filename)
+                # choice 2: win/loss/other
                 elif classifier == 'winloss':
                     pass #FIXME
-                elif classifier == 'mychar':
-                    players_section = re.findall('characters=.*\s+.*\s+.*\s', str(game))
-                    chars = ['']*4
-                    conn_codes = ['']*4
-                    for i in range(len(players_section)):
-                        chars[i] = re.findall('characters=.*:.*:', str(game))[i].replace('characters={'+str(i+1)+':', '').replace(':', '')
-                        conn_codes[i] = re.findall('code=.*,', str(game))[i].replace('code=', '').replace(',', '')
-                    for i in range(len(conn_codes)):
-                        if conn_codes[i] == MY_CODE:
-                            mychar = chars[i]
-                    print(SLP_DIR+'/'+mychar+'-me/'+filename) # placeholder for moving file
-                    #os.rename(curr_file, SLP_DIR+'/'+mychar+'-me/'+filename)
-                elif classifier == 'oppchar':
-                    players_section = re.findall('characters=.*\s+.*\s+.*\s', str(game))
-                    chars = ['']*4
-                    conn_codes = ['']*4
-                    for i in range(len(players_section)):
-                        chars[i] = re.findall('characters=.*:.*:', str(game))[i].replace('characters={'+str(i+1)+':', '').replace(':', '')
-                        conn_codes[i] = re.findall('code=.*,', str(game))[i].replace('code=', '').replace(',', '')
-                    for i in range(len(conn_codes)):
-                        if conn_codes[i] != MY_CODE:
-                            oppchar = chars[i]
-                            break
-                    print(SLP_DIR+'/'+oppchar+'-opp/'+filename) # placeholder for moving file
-                    #os.rename(curr_file, SLP_DIR+'/'+oppchar+'-opp/'+filename)
-
+                # choice 3: user's character or opponent's character
+                elif classifier == 'mychar' or classifier == 'oppchar':
+                    platform = re.findall('platform=.*,', str(game))[0].replace('platform=','').replace(',','')
+                    dolphin = False
+                    try:
+                        re.findall('DOLPHIN', platform)[0]
+                        dolphin = True
+                    except IndexError:
+                        dolphin = False
+                    if dolphin:
+                        players_section = re.findall('characters=.*\s+.*\s+.*\s', str(game))
+                        chars = ['']*4
+                        conn_codes = ['']*4
+                        char = ''
+                        for i in range(len(players_section)):
+                            chars[i] = re.findall('characters=.*:.*:', str(game))[i].replace('characters={', '').replace(':', '')
+                            conn_codes[i] = re.findall('code=.*,', str(game))[i].replace('code=', '').replace(',', '')
+                        for i in range(len(conn_codes)):
+                            if classifier == 'mychar' and conn_codes[i] == MY_CODE:
+                                char = ''.join([i for i in chars[i] if not i.isdigit()])
+                                break
+                            if classifier == 'oppchar' and conn_codes[i] != MY_CODE:
+                                char = ''.join([i for i in chars[i] if not i.isdigit()])
+                                break
+                        label = ''
+                        if char != '':
+                            if classifier == 'mychar':
+                                label = '-me/'
+                            elif classifier == 'oppchar':
+                                label = '-opp/'
+                            #print(SLP_DIR+'/'+char+label+filename) # debug output
+                            if label != '':
+                                try:
+                                    os.rename(curr_file, SLP_DIR+'/'+char+label+filename)
+                                except FileNotFoundError:
+                                    os.mkdir(SLP_DIR+'/'+char+label)
+                                    os.rename(curr_file, SLP_DIR+'/'+char+label+filename)
 
 def consolidate(dir):
     """
-    Recursively iterates through directory, moving all files to tmp directory.
+    Recursively iterates through directory, adding all .slp files to master list.
     """
     for item in os.listdir(dir):
         # if its a directory, recursively iterate through it
         if os.path.isdir(os.path.join(dir,item)):
             consolidate(os.path.join(dir,item))
-        # if its a file, move it to tmp folder
+        # if its a file, append to files list
         else:
-            try:
-                os.rename(os.path.join(dir,item), SLP_DIR+'/tmp/'+item)
-            except FileNotFoundError:
-                os.mkdir(SLP_DIR+'/tmp')
-                os.rename(os.path.join(dir,item), SLP_DIR+'/tmp/'+item)
+            if Path(item).suffix == '.slp':
+                all_replay_files.append(str(os.path.join(dir,item)))
+
+def progress(duration):
+    value = 1
+    size = 50 # number of * in progress bar
+    print()
+    timestamp = time()
+    while value <= size:
+        print('|' + '*'*value + ' '*(size-value) + '|  ' + str(round(value/size*100)) + '%\ttime left: ' + str(int(duration)-(round(time() - timestamp))) + 's', end='   \r')
+        sleep(duration/size)
+        value+=1
+    print('\n')
 ##########      END DEFINING FUNCTIONS          ##########
+
+
+# recursively gather all .slp files in all subdirectories into one list
+all_replay_files = []
+consolidate(SLP_DIR)
+total_file_count = len(all_replay_files)
+
+if total_file_count == 0:
+    print('No .slp files found in given directory. Exiting...\n')
+    exit()
+else:
+    print('\nDone gathering',total_file_count,'.slp files!')
 
 # user prompt
 while True:
-    choice = input('''\nChoose classifier by which to organize files:\n\n\t1. date
-                                                                        \n\t2. win/loss/draw/unfinished (not implemented)
-                                                                        \n\t3. my character (not implemented)
-                                                                        \n\t4. opponent character (not implemented)
-                                                                        \n> ''')
+    choice = input('''\nChoose classifier by which to organize files:\n\n\t1. date\n\t2. win/loss/other (not implemented)\n\t3. my character\n\t4. opponent character\n> ''')
     if choice == '1':
-        classifier = 'date'
+        _classifier = 'date'
         break
     elif choice == '2':
-        classifier = 'winloss'
+        _classifier = 'winloss'
         break
     elif choice == '3':
-        classifier = 'mychar'
+        _classifier = 'mychar'
+        MY_CODE = input('Enter your connect code (ex: MIRE#409): ')
         break
     elif choice == '4':
-        classifier = 'oppchar'
+        _classifier = 'oppchar'
+        MY_CODE = input('Enter your connect code (ex: MIRE#409): ')
         break
     else:
         print('Invalid answer.')
 
-classifier = 'date' # only correctly implemented option
 
+# start time
 timestamp = time.time()
-consolidate(SLP_DIR)
-print('done consolidating files to tmp! total time:\t', time.time() - timestamp, 'seconds')
-print('now dividing files in tmp into', NUM_PROCESSES, 'folders...')
 
-print('\n')
-all_filenames = [name for name in os.listdir(SLP_DIR+'/tmp/') if os.path.isfile(SLP_DIR+'/tmp/'+name)]
-total_file_count = len(all_filenames)
-group_size = int(total_file_count/NUM_PROCESSES)
-print('file count:',total_file_count)
-print('cpus:',NUM_PROCESSES)
-print('group size:',group_size)
-subgroups = [all_filenames[i:i+group_size] for i in range(0, len(all_filenames), group_size)]
+# prepare int(NUM_PROCESSES) groups of files, print info
+group_size = int(total_file_count/(NUM_PROCESSES-1))
+print('\nfile count:',total_file_count)
+print('number of processes to be started:',NUM_PROCESSES)
+try:
+    input('\nPress ENTER to continue, CTRL-C to exit...')
+except KeyboardInterrupt:
+    exit('\n')
+subgroups = [all_replay_files[i:i+group_size] for i in range(0, len(all_replay_files), group_size)]
 
+# start organizing files using int(NUM_PROCESSES) processes
 processes = []
 for i in range(len(subgroups)):
-    processes.append(mp.Process(target=iterate_group, args=(subgroups[i], classifier)))
+    processes.append(mp.Process(target=iterate_group, args=(subgroups[i], _classifier)))
     processes[i].start()
-
 for process in processes:
     process.join()
 
-#os.rmdir(SLP_DIR+'/tmp/')
-print('done!\n\t' + str(total_file_count) + ' files organized in ' + str(time.time() - timestamp) + ' seconds')
+# clean up now-empty folders
+if _classifier == 'date':
+    empty_folders = glob.glob(SLP_DIR+'/*-opp/') + glob.glob(SLP_DIR+'/*-me/')
+    for item in empty_folders:
+        os.rmdir(item)
+elif _classifier == 'mychar':
+    empty_folders = glob.glob(SLP_DIR+'/*-opp/') + glob.glob(SLP_DIR+'/*-*-*-matches/')
+    for item in empty_folders:
+        os.rmdir(item)
+elif _classifier == 'oppchar':
+    empty_folders = glob.glob(SLP_DIR+'/*-me/') + glob.glob(SLP_DIR+'/*-*-*-matches/')
+    for item in empty_folders:
+        os.rmdir(item)
+
+# print info on exit
+print('\ndone!\t' + str(total_file_count) + ' files organized in ' + str(round(time.time() - timestamp, 3)) + ' seconds')
 exit()
