@@ -9,4 +9,4 @@ The program is written in Python3. The only third-party dependency can be instal
 Run the program, and follow the instructions it prints.
 
 ## Notes
-It's a bit of a resource hog and will probably push your CPU to 100% utilization. But, it's decently fast (~2176 files/minute, ~36.26 files/second).
+Now compatible for both Linux and Windows. It's a bit of a resource hog and will probably push your CPU to 100% utilization. But, it's decently fast (~2176 files/minute, ~36.26 files/second).
