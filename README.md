@@ -1,6 +1,6 @@
 # slp-organizer
 ## Description
-Organize your thousands of .slp files into subfolders based on date, match outcome, user character, or opponent character. I'm not claiming it's a super useful application; I just wanted to get my feet wet with parsing .slp replay data. See Notes section for more info.
+Organize your thousands of .slp files into subfolders based on date, match outcome, user character, or opponent character. Retrieves this data using [py-slippi](https://github.com/hohav/py-slippi). I'm not claiming it's a super useful application; I just wanted to get my feet wet with parsing .slp replay data. See Notes section for more info.
 
 ## Setup
 The program is written in Python3. The only third-party dependency can be installed with ``pip install py-slippi``.
