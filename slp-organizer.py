@@ -23,7 +23,6 @@ Single process: 500 files iterated per ~90 seconds (~333 files/minute, ~5.55 fil
 Multiprocessing: 4136 files iterated in ~114 seconds (~2176 files/minute, ~36.26 files/second)
 
 TO DO:
-    - look into changing os.rename command based on user OS
     - check if file is already where it belongs, to eliminate redundancy
     - add progress bar :D
     - try to do something about date conversion from UTC... or just don't bother
