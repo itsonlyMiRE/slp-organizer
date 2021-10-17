@@ -172,6 +172,7 @@ if __name__ == '__main__':
             _classifier = 'date'
             break
         elif choice == '2':
+            exit('\nThis option is not yet implemented.')
             _classifier = 'winloss'
             break
         elif choice == '3' or choice == '4':
